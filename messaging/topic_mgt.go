@@ -28,6 +28,7 @@ const (
 	iidEndpoint    = "https://iid.googleapis.com/iid/v1"
 	iidSubscribe   = ":batchAdd"
 	iidUnsubscribe = ":batchRemove"
+	iidBatchImport = ":batchImport"
 )
 
 var iidErrorCodes = map[string]struct{ Code, Msg string }{
@@ -124,6 +125,27 @@ func (c *iidClient) UnsubscribeFromTopic(ctx context.Context, tokens []string, t
 	return c.makeTopicManagementRequest(ctx, req)
 }
 
+func (c *iidClient) ImportAPNsTokens(ctx context.Context, apnsTokens []string, application string, sandbox bool) (*IIDImportResponse, error) {
+	req := &iidImportRequest{
+		APNsTokens:  apnsTokens,
+		Application: application,
+		Sandbox:     sandbox,
+	}
+	return c.makeBatchImportRequest(ctx, req)
+}
+
+type iidImportRequest struct {
+	Application  string   `json:"application"`
+	Sandbox      bool `json:"sandbox"`
+	APNsTokens   []string `json:"apns_tokens"`
+}
+
+type IIDImportResult struct {
+	Status            string `json:"status"`
+	APNsToken         string `json:"apns_token"`
+	RegistrationToken string `json:"registration_token"`
+}
+
 type iidRequest struct {
 	Topic  string   `json:"to"`
 	Tokens []string `json:"registration_tokens"`
@@ -134,8 +156,42 @@ type iidResponse struct {
 	Results []map[string]interface{} `json:"results"`
 }
 
+type IIDImportResponse struct {
+	Results []IIDImportResult `json:"results"`
+}
+
 type iidError struct {
 	Error string `json:"error"`
+}
+
+func (c *iidClient) makeBatchImportRequest(ctx context.Context, req *iidImportRequest) (*IIDImportResponse, error) {
+	if len(req.APNsTokens) == 0 {
+		return nil, fmt.Errorf("no tokens specified")
+	}
+	if len(req.APNsTokens) > 100 {
+		return nil, fmt.Errorf("tokens list must not contain more than 100 items")
+	}
+	for _, token := range req.APNsTokens {
+		if token == "" {
+			return nil, fmt.Errorf("tokens list must not contain empty strings")
+		}
+	}
+
+	if req.Application == "" {
+		return nil, fmt.Errorf("application name not specified")
+	}
+
+	request := &internal.Request{
+		Method: http.MethodPost,
+		URL:    fmt.Sprintf("%s/%s", c.iidEndpoint, iidBatchImport),
+		Body:   internal.NewJSONEntity(req),
+	}
+	var result IIDImportResponse
+	if _, err := c.httpClient.DoAndUnmarshal(ctx, request, &result); err != nil {
+		return nil, err
+	}
+
+	return &result, nil
 }
 
 func (c *iidClient) makeTopicManagementRequest(ctx context.Context, req *iidRequest) (*TopicManagementResponse, error) {
