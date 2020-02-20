@@ -183,7 +183,7 @@ func (c *iidClient) makeBatchImportRequest(ctx context.Context, req *iidImportRe
 
 	request := &internal.Request{
 		Method: http.MethodPost,
-		URL:    fmt.Sprintf("%s/%s", c.iidEndpoint, iidBatchImport),
+		URL:    fmt.Sprintf("%s%s", c.iidEndpoint, iidBatchImport),
 		Body:   internal.NewJSONEntity(req),
 	}
 	var result IIDImportResponse
@@ -220,7 +220,7 @@ func (c *iidClient) makeTopicManagementRequest(ctx context.Context, req *iidRequ
 
 	request := &internal.Request{
 		Method: http.MethodPost,
-		URL:    fmt.Sprintf("%s/%s", c.iidEndpoint, req.op),
+		URL:    fmt.Sprintf("%s%s", c.iidEndpoint, req.op),
 		Body:   internal.NewJSONEntity(req),
 	}
 	var result iidResponse
